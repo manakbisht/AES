@@ -67,24 +67,44 @@ public class AES {
         key = generateKey(keyLength);
     }
 
+    public AES (String key) {
+        int keyLength = key.length();
+        switch (keyLength) {
+            case 128:
+                nRounds = 10;
+                break;
+            case 192:
+                nRounds = 12;
+                throw new UnsupportedOperationException();
+            case 256:
+                nRounds = 14;
+                throw new UnsupportedOperationException();
+            default:
+                throw new IllegalArgumentException();
+        }
+        // Change to support 192 bit and 256 bit keys
+        this.key = new int[4][4];
+        convertToMatrix(key, this.key);
+    }
+
     private int[][] nextRoundKey(int[][] previousRoundKey, int iRC) {
         // Reimplement to support 192 bit and 256 bit keys
         int[][] ret = new int[4][4];
         int[] g = new int[4];
-        for(int i=0;i<4;i++) g[i] = previousRoundKey[3][i];
+        for (int i=0;i<4;i++) g[i] = previousRoundKey[3][i];
         gFunction(g, iRC);
 
-        for(int i=0;i<4;i++) ret[0][i] = previousRoundKey[0][i]^g[i];
-        for(int i=0;i<4;i++) ret[1][i] = previousRoundKey[1][i]^ret[0][i];
-        for(int i=0;i<4;i++) ret[2][i] = previousRoundKey[2][i]^ret[1][i];
-        for(int i=0;i<4;i++) ret[3][i] = previousRoundKey[3][i]^ret[2][i];
+        for (int i=0;i<4;i++) ret[0][i] = previousRoundKey[0][i]^g[i];
+        for (int i=0;i<4;i++) ret[1][i] = previousRoundKey[1][i]^ret[0][i];
+        for (int i=0;i<4;i++) ret[2][i] = previousRoundKey[2][i]^ret[1][i];
+        for (int i=0;i<4;i++) ret[3][i] = previousRoundKey[3][i]^ret[2][i];
 
         return ret;
     }
 
     private void gFunction(int[] w, int iRC) {
         circularLeftShift(w, 1);
-        for(int i=0;i<w.length;i++) {
+        for (int i=0;i<w.length;i++) {
             int val = w[i];
             w[i] = sBox[val/16][val%16];
         }
@@ -92,8 +112,8 @@ public class AES {
     }
 
     private void addRoundKey(int[][] block, int[][] roundKey) {
-        for(int i=0;i<4;i++) {
-            for(int j=0;j<4;j++) {
+        for (int i=0;i<4;i++) {
+            for (int j=0;j<4;j++) {
                 block[i][j] ^= roundKey[i][j];
             }
         }
@@ -103,13 +123,13 @@ public class AES {
         int n = arr.length;
         int[] list = new int[mag];
 
-        for(int i=0;i<n-mag;i++) {
+        for (int i=0;i<n-mag;i++) {
             if (i<mag) list[i] = arr[i];
             arr[i] = arr[i+mag];
         }
 
         int j = 0;
-        for(int i=n-mag;i<n;i++) arr[i] = list[j++];
+        for (int i=n-mag;i<n;i++) arr[i] = list[j++];
     }
 
     private void circularRightShift(int[] arr, int mag) {
@@ -117,27 +137,28 @@ public class AES {
         int[] list = new int[mag];
 
         int j = mag-1;
-        for(int i=n-1;i>=mag;i--) {
+        for (int i=n-1;i>=mag;i--) {
             if (i>=n-mag) list[j--] = arr[i];
             arr[i] = arr[i-mag];
         }
 
-        for(int i=0;i<mag;i++) arr[i] = list[i];
+        for (int i=0;i<mag;i++) arr[i] = list[i];
     }
 
-    private void convertToMatrix(String s, int[][] grid) {
-        for(int i=0;i<s.length();i+=2) {
+    private void convertToMatrix(String s, int[][] matrix) {
+        // Reimplement to support 192 bit and 256 bit keys
+        for (int i=0;i<s.length();i+=2) {
             int j = i/2;
-            grid[j%4][j/4] = Integer.parseInt(s.substring(i,i+2), 16);
+            matrix[j%4][j/4] = Integer.parseInt(s.substring(i,i+2), 16);
         }
     }
 
     private void shiftRows(int[][] block) {
-        for(int i=1;i<4;i++) circularLeftShift(block[i], i);
+        for (int i=1;i<4;i++) circularLeftShift(block[i], i);
     }
 
     private void inverseShiftRows(int[][] block) {
-        for(int i=1;i<4;i++) circularRightShift(block[i], i);
+        for (int i=1;i<4;i++) circularRightShift(block[i], i);
     }
 
     private void mixColumns(int[][] block) {
@@ -149,16 +170,16 @@ public class AES {
     }
 
     private void substituteBytes(int[][] block) {
-        for(int i=0;i<4;i++)
-            for(int j=0;j<4;j++) {
+        for (int i=0;i<4;i++)
+            for (int j=0;j<4;j++) {
                 int val = block[i][j];
                 block[i][j] = sBox[val/16][val%16];
             }
     }
 
     private void inverseSubstituteBytes(int[][] block) {
-        for(int i=0;i<4;i++)
-            for(int j=0;j<4;j++){
+        for (int i=0;i<4;i++)
+            for (int j=0;j<4;j++){
                 int val = block[i][j];
                 block[i][j] = inverseSBox[val/16][val%16];
             }
