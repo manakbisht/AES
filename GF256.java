@@ -57,20 +57,23 @@ public class GF256 {
         int[] xPoly = hexToPoly(x);
         int[] yPoly = hexToPoly(y);
         int[] dividend = multiply(xPoly, yPoly);
-        System.out.println(Integer.toHexString(polyToHex(multiply(xPoly, yPoly))));
         int[] divisor = new int[16];
 
-        int i = 15;
+        int i = 0;
         while (true) {
-            for (;i>=0;i--) {
+            for (;i<16;i++) {
                 if (dividend[i]==1) break;
             }
-            if (i<8) break;
+            if (i>7) break;
 
-            for (int j=15;j>i;j--) divisor[j] = 0;
-            int k = 9;
-            for (int j=i;j>i-9;j--) divisor[j] = irrPoly[k--];
-            for (int j=i-9;j>=0;j--) divisor[j] = 0;
+            for (int j=0;j<i;j++) divisor[j] = 0;
+            int k = 7;
+            int j;
+            for (j=i;;j++) {
+                divisor[j] = irrPoly[k++];
+                if (k>15) break;
+            }
+            for (;j<16;j++) divisor[j] = 0;
             add(dividend, divisor);
         }
         return polyToHex(dividend);
