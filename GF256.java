@@ -68,12 +68,11 @@ public class GF256 {
 
             for (int j=0;j<i;j++) divisor[j] = 0;
             int k = 7;
-            int j;
-            for (j=i;;j++) {
-                divisor[j] = irrPoly[k++];
-                if (k>15) break;
+            int j=i;
+            while (k<=15) {
+                divisor[j++] = irrPoly[k++];
             }
-            for (;j<16;j++) divisor[j] = 0;
+            
             add(dividend, divisor);
         }
         return polyToHex(dividend);
