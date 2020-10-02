@@ -1,7 +1,7 @@
 public class AES {
     private final int[][] key;
     private final int nRounds;
-
+    private int[][][] roundKeys;
     private static final int[][] inverseSBox = {
             {0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb},
             {0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb},
@@ -145,12 +145,21 @@ public class AES {
         for (int i=0;i<mag;i++) arr[i] = list[i];
     }
 
-    private void convertToMatrix(String s, int[][] matrix) {
+    private int[][] convertToMatrix(String s) {
         // Reimplement to support 192 bit and 256 bit keys
+        int[][] matrix=new int[4][4];
         for (int i=0;i<s.length();i+=2) {
             int j = i/2;
             matrix[j%4][j/4] = Integer.parseInt(s.substring(i,i+2), 16);
         }
+        return matrix;
+    }
+    private String convertToString(int[][] arr) {
+        StringBuilder strb=new StringBuilder();
+        for (int i=0;i<4;i++)
+            for (int j=0;j<4;j++)
+                strb.append(Integer.toHexString(arr[j][i]));
+        return strb.toString();
     }
 
     private void shiftRows(int[][] block) {
@@ -187,5 +196,32 @@ public class AES {
 
     private int[][] generateKey(int keyLength) {
         throw new UnsupportedOperationException();
+    }
+    private void roundEncryption(int[][] plaintext,int roundNum) {
+        substituteBytes(plaintext);
+        shiftRows(plaintext);
+        if (roundNum<10) mixColumns(plaintext);
+        addRoundKey(plaintext,roundKeys[roundNum-1]);
+    }
+    private void roundDecryption(int[][] ciphertext,int roundNum) {
+        if (roundNum>1) inverseMixColumns(ciphertext);
+        inverseShiftRows(ciphertext);
+        inverseSubstituteBytes(ciphertext);
+        addRoundKey(ciphertext,roundKeys[10-roundNum-1]);
+    }
+    public String encrypt(String plaintext) {
+        int[][] inputMatrix=convertToMatrix(plaintext);
+        addRoundKey(inputMatrix,key);
+        for (int i=1;i<=10;i++)
+            roundEncryption(inputMatrix,i);
+        return convertToString(inputMatrix);
+    }
+    public String decrypt(String ciphertext) {
+        int[][] inputMatrix=convertToMatrix(ciphertext);
+        addRoundKey(inputMatrix,roundKeys[9]);
+        for (int i=1;i<10;i++)
+            roundDecryption(inputMatrix,i);
+        addRoundKey(inputMatrix,key);
+        return convertToString(inputMatrix);
     }
 }
