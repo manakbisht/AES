@@ -72,15 +72,9 @@ public class GF256 {
             while (k<=15) {
                 divisor[j++] = irrPoly[k++];
             }
-            
+            //for (;j<16;j++) divisor[j] = 0;
             add(dividend, divisor);
         }
         return polyToHex(dividend);
-    }
-
-
-    public static void main(String[] args) {
-        int ans = product(0x53, 0xca);
-        System.out.println(Integer.toHexString(ans));
     }
 }

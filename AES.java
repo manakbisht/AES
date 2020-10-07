@@ -1,7 +1,10 @@
+import java.util.Random;
 public class AES {
     private final int[][] key;
     private final int nRounds;
-    private int[][][] roundKeys;
+    int[][][] roundKeys;
+    private String[] encOutputs;
+    private String[] decOutputs;
     private static final int[][] inverseSBox = {
             {0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb},
             {0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb},
@@ -64,42 +67,73 @@ public class AES {
             default:
                 throw new IllegalArgumentException();
         }
-        key = generateKey(keyLength);
+        key=new int[4][4];
+        generateKey(keyLength);
+        System.out.println("Key generated: "+ matrToString(key));
+        System.out.println("");
+        roundKeys=new int[10][4][4];
+        generateAllRoundKeys();
     }
 
     public AES (String key) {
         int keyLength = key.length();
         switch (keyLength) {
-            case 128:
+            case 32:
                 nRounds = 10;
                 break;
-            case 192:
+            case 48:
                 nRounds = 12;
                 throw new UnsupportedOperationException();
-            case 256:
+            case 64:
                 nRounds = 14;
                 throw new UnsupportedOperationException();
             default:
                 throw new IllegalArgumentException();
         }
         // Change to support 192 bit and 256 bit keys
-        this.key = new int[4][4];
-        convertToMatrix(key, this.key);
+        this.key = convertToMatrix(key);
+        roundKeys=new int[10][4][4];
+        generateAllRoundKeys();
     }
-
+    private String getHexRep(String s) {
+        char[] req=s.toCharArray();
+        StringBuilder strb=new StringBuilder();
+        for (char c: req){
+            String s1=Integer.toHexString(c);
+            if (s1.length()==1) strb.append('0');
+            strb.append(s1);
+        }
+        return strb.toString().toUpperCase();
+    }
+    private String hexToString(String s) {
+        char[] req=new char[8];
+        for (int i=0;i<s.length();i+=2) {
+            char c=(char) Integer.parseInt(s.substring(i,i+2),16);
+            req[i]=c;
+        }
+        return req.toString();
+    }
     private int[][] nextRoundKey(int[][] previousRoundKey, int iRC) {
         // Reimplement to support 192 bit and 256 bit keys
         int[][] ret = new int[4][4];
         int[] g = new int[4];
-        for (int i=0;i<4;i++) g[i] = previousRoundKey[3][i];
+        for (int i=0;i<4;i++) g[i] = previousRoundKey[i][3];
         gFunction(g, iRC);
-
-        for (int i=0;i<4;i++) ret[0][i] = previousRoundKey[0][i]^g[i];
-        for (int i=0;i<4;i++) ret[1][i] = previousRoundKey[1][i]^ret[0][i];
-        for (int i=0;i<4;i++) ret[2][i] = previousRoundKey[2][i]^ret[1][i];
-        for (int i=0;i<4;i++) ret[3][i] = previousRoundKey[3][i]^ret[2][i];
+        for (int i=0;i<4;i++) ret[i][0] = previousRoundKey[i][0]^g[i];
+        for (int i=0;i<4;i++) ret[i][1] = previousRoundKey[i][1]^ret[i][0];
+        for (int i=0;i<4;i++) ret[i][2] = previousRoundKey[i][2]^ret[i][1];
+        for (int i=0;i<4;i++) ret[i][3] = previousRoundKey[i][3]^ret[i][2];
 
         return ret;
+    }
+    private void generateAllRoundKeys() {
+        int iRC=0x01;
+        roundKeys[0]=nextRoundKey(key,iRC);
+        iRC=GF256.product(iRC,0x02);
+        for (int i=1;i<10;i++) {
+            roundKeys[i]=nextRoundKey(roundKeys[i-1],iRC);
+            iRC=GF256.product(iRC,0x02);
+        }
     }
 
     private void gFunction(int[] w, int iRC) {
@@ -108,7 +142,8 @@ public class AES {
             int val = w[i];
             w[i] = sBox[val/16][val%16];
         }
-        w[0] ^= iRC;
+        w[0]^=iRC;
+
     }
 
     private void addRoundKey(int[][] block, int[][] roundKey) {
@@ -122,9 +157,11 @@ public class AES {
     private void circularLeftShift(int[] arr, int mag) {
         int n = arr.length;
         int[] list = new int[mag];
-
+        for (int i=0;i<mag;i++) {
+            list[i]=arr[i];
+        }
         for (int i=0;i<n-mag;i++) {
-            if (i<mag) list[i] = arr[i];
+           // if (i<mag) list[i] = arr[i];
             arr[i] = arr[i+mag];
         }
 
@@ -135,10 +172,12 @@ public class AES {
     private void circularRightShift(int[] arr, int mag) {
         int n = arr.length;
         int[] list = new int[mag];
-
-        int j = mag-1;
+        int k=n-1;
+        for (int j=mag-1;j>=0;j--) {
+            list[j]=arr[k--];
+        }
         for (int i=n-1;i>=mag;i--) {
-            if (i>=n-mag) list[j--] = arr[i];
+           // if (i>=n-mag) list[j--] = arr[i];
             arr[i] = arr[i-mag];
         }
 
@@ -148,18 +187,22 @@ public class AES {
     private int[][] convertToMatrix(String s) {
         // Reimplement to support 192 bit and 256 bit keys
         int[][] matrix=new int[4][4];
-        for (int i=0;i<s.length();i+=2) {
+        for (int i=0;i<s.length()-1;i+=2) {
             int j = i/2;
             matrix[j%4][j/4] = Integer.parseInt(s.substring(i,i+2), 16);
         }
         return matrix;
     }
-    private String convertToString(int[][] arr) {
+    private String matrToString(int[][] arr) {
         StringBuilder strb=new StringBuilder();
         for (int i=0;i<4;i++)
-            for (int j=0;j<4;j++)
-                strb.append(Integer.toHexString(arr[j][i]));
-        return strb.toString();
+            for (int j=0;j<4;j++){
+                String req=Integer.toHexString(arr[j][i]);
+                if (req.length()==1) strb.append("0");
+                strb.append(req);
+            }
+
+        return strb.toString().toUpperCase();
     }
 
     private void shiftRows(int[][] block) {
@@ -169,13 +212,30 @@ public class AES {
     private void inverseShiftRows(int[][] block) {
         for (int i=1;i<4;i++) circularRightShift(block[i], i);
     }
+    private int[][] matrixMultiplication(int[][] x, int[][] y) {
+        int[][] result=new int[4][4];
+        for (int i=0;i<4;i++) {
+            for (int j=0;j<4;j++) {
+                int val=0;
+                for (int k=0;k<4;k++) {
 
+                    val=GF256.sum(val,GF256.product(x[i][k],y[k][j]));
+                }
+                result[i][j]=val;
+            }
+        }
+        return result;
+    }
     private void mixColumns(int[][] block) {
-        throw new UnsupportedOperationException();
+        int[][] res=matrixMultiplication(mixColTransformation,block);
+        for (int i=0;i<4;i++)
+            for (int j=0;j<4;j++) block[i][j]=res[i][j];
     }
 
     private void inverseMixColumns(int[][] block) {
-        throw new UnsupportedOperationException();
+        int[][] res=matrixMultiplication(inverseMixColTransformation,block);
+        for (int i=0;i<4;i++)
+            for (int j=0;j<4;j++) block[i][j]=res[i][j];
     }
 
     private void substituteBytes(int[][] block) {
@@ -194,8 +254,12 @@ public class AES {
             }
     }
 
-    private int[][] generateKey(int keyLength) {
-        throw new UnsupportedOperationException();
+    private void generateKey(int keyLength) {
+        Random r=new Random();
+        for (int i=0;i<16;i++) {
+            int val=r.nextInt(256);
+            key[i%4][i/4]=val;
+        }
     }
     private void roundEncryption(int[][] plaintext,int roundNum) {
         substituteBytes(plaintext);
@@ -204,24 +268,71 @@ public class AES {
         addRoundKey(plaintext,roundKeys[roundNum-1]);
     }
     private void roundDecryption(int[][] ciphertext,int roundNum) {
+        addRoundKey(ciphertext,roundKeys[10-roundNum]);
         if (roundNum>1) inverseMixColumns(ciphertext);
         inverseShiftRows(ciphertext);
         inverseSubstituteBytes(ciphertext);
-        addRoundKey(ciphertext,roundKeys[10-roundNum-1]);
     }
     public String encrypt(String plaintext) {
+        //String input=getHexRep(plaintext);
+        //System.out.println(input.length());
         int[][] inputMatrix=convertToMatrix(plaintext);
+        encOutputs=new String[11];
+        encOutputs[0]=plaintext;
         addRoundKey(inputMatrix,key);
-        for (int i=1;i<=10;i++)
+       // encOutputs[1]=matrToString(inputMatrix);
+        for (int i=1;i<=10;i++){
             roundEncryption(inputMatrix,i);
-        return convertToString(inputMatrix);
+            encOutputs[i]= matrToString(inputMatrix);
+        }
+        String ciphertext= matrToString(inputMatrix);
+        encOutputs[10]=ciphertext;
+        return ciphertext;
     }
     public String decrypt(String ciphertext) {
+        decOutputs=new String[11];
         int[][] inputMatrix=convertToMatrix(ciphertext);
-        addRoundKey(inputMatrix,roundKeys[9]);
-        for (int i=1;i<10;i++)
+        //addRoundKey(inputMatrix,roundKeys[9]);
+        decOutputs[0]=ciphertext;
+        for (int i=1;i<=10;i++){
             roundDecryption(inputMatrix,i);
+            decOutputs[i]= matrToString(inputMatrix);
+        }
         addRoundKey(inputMatrix,key);
-        return convertToString(inputMatrix);
+        String plaintext= matrToString(inputMatrix);
+        decOutputs[10]=plaintext;
+        return plaintext;
+    }
+    public void displayRounds() {
+        System.out.println("Encryption input (plaintext): "+encOutputs[0]);
+        System.out.println("Decryption round 10 (plaintext): "+decOutputs[10]);
+        System.out.println("Round key: "+matrToString(key));
+        if (!encOutputs[0].equals(decOutputs[10])) {
+            System.out.println("ERROR!");
+            System.exit(0);
+        }
+        else System.out.println("MATCH SUCCESSFUL!");
+        System.out.println("");
+        for (int i=1;i<=9;i++) {
+            System.out.println("Encryption round "+i+": "+encOutputs[i]);
+            System.out.println("Decryption round "+(10-i)+": "+decOutputs[10-i]);
+            System.out.println("Round key: "+matrToString(roundKeys[i-1]));
+            if (!(encOutputs[i].equals(decOutputs[10-i]))) {
+                System.out.println("ERROR!");
+                System.exit(0);
+            }
+            else System.out.println("MATCH SUCCESSFUL!");
+            System.out.println("");
+        }
+        System.out.println("Encryption round 10 (ciphertext): "+encOutputs[10]);
+        System.out.println("Decryption input (ciphertext): "+decOutputs[0]);
+        System.out.println("Round key: "+matrToString(roundKeys[9]));
+        if (!encOutputs[10].equals(decOutputs[0])) {
+            System.out.println("ERROR!");
+            System.exit(0);
+        }
+        else System.out.println("MATCH SUCCESSFUL!");
+        System.out.println("");
+        System.out.println("VERIFIED: All rounds are functioning properly.");
     }
 }
